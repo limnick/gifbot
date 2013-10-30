@@ -21,7 +21,7 @@ MARGIN = 2
 FONT = ImageFont.truetype(os.path.join(BASE_PATH, "anony.ttf"),12)
 streams = set()
 
-output_buffer = deque(["" for _ in range(7)])
+output_buffer = deque(["" for _ in range(6)])
 
 gifWriter = GifWriter()
 gifWriter.transparency = False
@@ -50,7 +50,7 @@ HEADER_DATA = get_header_data()
 
 def new_msg(msg):
     output_buffer.append(msg.decode("utf-8", 'ignore'))
-    if len(output_buffer) > 7:
+    if len(output_buffer) > 6:
         output_buffer.popleft()
 
 def connection_ready(sock, fd, events):
@@ -94,13 +94,15 @@ def handle_connection(connection, address):
     stream.write("\r\n")
     
     stream.write(HEADER_DATA)
+    stream.write(LAST_FRAME)
     callback = functools.partial(closestream, stream)
     ioloop.IOLoop.instance().add_timeout(datetime.timedelta(seconds=MAX_TIME), callback)
     streams.add(stream)
 
 def send_latest():
-    global streams
+    global streams, LAST_FRAME
     latest_gif = get_img_frame()
+    LAST_FRAME = latest_gif
 
     new_streams = set()
     for stream in streams:
@@ -112,6 +114,8 @@ def send_latest():
 def gen_img():
     img = Image.new("RGB", (600,100))
     draw = ImageDraw.Draw(img)
+
+    draw.text((MARGIN,MARGIN+(14*6)), "----------- [{: ^18s}] ------ #yospos ------ synirc ------------".format(str(len(streams))+" viewers"), (0,255,0), font=FONT)
     for i,line in enumerate(output_buffer):
         draw.text((MARGIN,MARGIN+(i*14)), line, (0,255,0), font=FONT)
     img = img.convert("P")
@@ -150,6 +154,7 @@ def chanmsg(self, channel, username, message):
     print "CHANMSG ", channel, username, message, ""
 
 if __name__ == '__main__':
+    LAST_FRAME,_ = gen_img()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
