@@ -15,7 +15,7 @@ BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 
 LAST_FRAME,HEADER_DATA = None,None
 
-BOT_NAME = "gifbot2"
+BOT_NAME = "gifbot"
 IRC_NETWORK = "irc.synirc.net"
 
 BIND_ADDR = "0.0.0.0"
