@@ -1,0 +1,2 @@
+git+git@github.com:python-imaging/Pillow.git#egg=Pillow-dev
+tornado

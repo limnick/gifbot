@@ -66,7 +66,7 @@ class IRCConn(object):
         self.conn.write(data + '\r\n', *args, **kwargs)
 
     def _handle_data(self, data):
-        print ">>>", data.rstrip()
+        # print ">>>", data.rstrip()
         logging.debug(">>> %s", data.rstrip())
         ping_md = PING_RE.match(data)
         if ping_md:

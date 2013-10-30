@@ -1,26 +1,34 @@
 import errno
 import functools
 import socket
-import time
 import datetime
+import os
+import gifplugin as GifImagePlugin
 from collections import deque
 from images2gif import GifWriter
 from io import BytesIO
 from tornado import ioloop, iostream
-from PIL import Image, ImageFont, ImageFile, ImageDraw, ImagePalette
-import gifplugin as GifImagePlugin
+from PIL import Image, ImageFont, ImageDraw
 from irctest import IRCConn
-import os
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 
-TIME_STEP = 5
+LAST_FRAME,HEADER_DATA = None,None
+
+BOT_NAME = "gifbot2"
+IRC_NETWORK = "irc.synirc.net"
+
+BIND_ADDR = "0.0.0.0"
+BIND_PORT = 80
+
+TIME_STEP = 4
 MAX_TIME = 60
 
+LINE_SPACING = 14
 MARGIN = 2
-FONT = ImageFont.truetype(os.path.join(BASE_PATH, "anony.ttf"),12)
-streams = set()
+FONT = ImageFont.truetype(os.path.join(BASE_PATH, "anony.ttf"), 12)
 
+streams = set()
 output_buffer = deque(["" for _ in range(6)])
 
 gifWriter = GifWriter()
@@ -28,25 +36,15 @@ gifWriter.transparency = False
 
 def get_header_data():
     rio = BytesIO()
-    img = Image.new("RGB", (600,100))
-    draw = ImageDraw.Draw(img)
-    draw.text((MARGIN,MARGIN), "asdf", (0,255,0), font=FONT)
-    img = img.convert("P")
-    img.encoderinfo = {}
-    palette = img.im.getpalette("RGB")[:768]
-    img.putpalette(palette)
+    img,palette = gen_img()
 
-    # Write header
-    # Gather info
     header = gifWriter.getheaderAnim(img)
     appext = gifWriter.getAppExt(1) #num loops
-    # Write
+
     rio.write(header)
     rio.write(palette)
     rio.write(appext)
     return rio.getvalue()
-
-HEADER_DATA = get_header_data()
 
 def new_msg(msg):
     output_buffer.append(msg.decode("utf-8", 'ignore'))
@@ -81,9 +79,9 @@ def _handle_headers(stream, data):
                 stream.close()
 
 def closestream(stream):
-    global streams
-    stream.write(";")
-    stream.close()
+    if not stream.closed():
+        stream.write(";")
+        stream.close()
 
 def handle_connection(connection, address):
     stream = iostream.IOStream(connection)
@@ -102,6 +100,8 @@ def handle_connection(connection, address):
 def send_latest():
     global streams, LAST_FRAME
     latest_gif = get_img_frame()
+    
+    del LAST_FRAME
     LAST_FRAME = latest_gif
 
     new_streams = set()
@@ -109,66 +109,61 @@ def send_latest():
         if not stream.closed():
             stream.write(latest_gif)
             new_streams.add(stream)
+
+    del streams
     streams = new_streams
 
 def gen_img():
     img = Image.new("RGB", (600,100))
     draw = ImageDraw.Draw(img)
 
-    draw.text((MARGIN,MARGIN+(14*6)), "----------- [{: ^18s}] ------ #yospos ------ synirc ------------".format(str(len(streams))+" viewers"), (0,255,0), font=FONT)
+    draw.text((MARGIN,MARGIN+(LINE_SPACING*6)), "----------- [{: ^18s}] ------ #yospos ------ synirc ------------".format(str(len(streams))+" viewers"), (0,255,0), font=FONT)
     for i,line in enumerate(output_buffer):
-        draw.text((MARGIN,MARGIN+(i*14)), line, (0,255,0), font=FONT)
+        draw.text((MARGIN,MARGIN+(i*LINE_SPACING)), line, (0,255,0), font=FONT)
     img = img.convert("P")
-    img.encoderinfo = {}
     palette = img.im.getpalette("RGB")[:768]
-    img.putpalette(palette)
     return img, palette
 
 def get_img_frame():
     img, palette = gen_img()
     rio = BytesIO()
     
-    # Write palette and image data
-    # Gather info
     data = GifImagePlugin.getdata(img)
     imdes, data = data[0], data[1:]
     graphext = gifWriter.getGraphicsControlExt(duration=TIME_STEP)
 
-    # Write local header
-    # Use global color palette
     rio.write(graphext)
-    rio.write(imdes) # write suitable image descriptor
+    rio.write(imdes)
 
-    # Write image data
     for d in data:
         rio.write(d)
     
     return rio.getvalue()
- 
+
 def chanmsg(self, channel, username, message):
     new_msg("{}: {}".format(username, message))
-    print repr(message)
     if message.startswith("!watchers"):
         msg = "There are {} open sockets. ".format(len(streams))
         self.chanmsg("#yospos", msg)
-    print "CHANMSG ", channel, username, message, ""
+    # print "CHANMSG ", channel, username, message, ""
 
 if __name__ == '__main__':
-    LAST_FRAME,_ = gen_img()
+    LAST_FRAME = get_img_frame()
+    HEADER_DATA = get_header_data()
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setblocking(0)
-    sock.bind(("0.0.0.0", 80))
+    sock.bind((BIND_ADDR, BIND_PORT))
     sock.listen(5000)
 
     io_loop = ioloop.IOLoop.instance()
     callback = functools.partial(connection_ready, sock)
     io_loop.add_handler(sock.fileno(), callback, io_loop.READ)
 
-    irc = IRCConn("gifbot", "gifbot", io_loop)
+    irc = IRCConn(BOT_NAME, BOT_NAME, io_loop)
     irc.on_chanmsg = functools.partial(chanmsg, irc)
-    irc.connect('irc.synirc.net', 6667)
+    irc.connect(IRC_NETWORK, 6667)
 
     def joinirc(irc):
         irc.join("#yospos")
