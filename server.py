@@ -10,10 +10,13 @@ from io import BytesIO
 from tornado import ioloop, iostream
 from PIL import Image, ImageFont, ImageDraw
 from irctest import IRCConn
+from .local import IRC_PASS, SECRET_NICKS
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 
 LAST_FRAME,HEADER_DATA = None,None
+
+CLOSE_ON_TIMEOUT = True
 
 BOT_NAME = "gifbot"
 IRC_NETWORK = "irc.synirc.net"
@@ -93,8 +96,9 @@ def handle_connection(connection, address):
     
     stream.write(HEADER_DATA)
     stream.write(LAST_FRAME)
-    callback = functools.partial(closestream, stream)
-    ioloop.IOLoop.instance().add_timeout(datetime.timedelta(seconds=MAX_TIME), callback)
+    if CLOSE_ON_TIMEOUT:
+        callback = functools.partial(closestream, stream)
+        ioloop.IOLoop.instance().add_timeout(datetime.timedelta(seconds=MAX_TIME), callback)
     streams.add(stream)
 
 def send_latest():
@@ -141,6 +145,8 @@ def get_img_frame():
     return rio.getvalue()
 
 def chanmsg(self, channel, username, message):
+    if username in SECRET_NICKS:
+        username = "YOSPOSTER"
     new_msg("{}: {}".format(username, message))
     if message.startswith("!watchers"):
         msg = "There are {} open sockets. ".format(len(streams))
@@ -169,7 +175,12 @@ if __name__ == '__main__':
         irc.join("#yospos")
     cb = functools.partial(joinirc, irc)
 
-    io_loop.add_timeout(datetime.timedelta(seconds=10), cb)
+    def register(irc):
+        irc.privmsg('nickserv', "identify {}".format(IRC_PASS))
+    reg = functools.partial(joinirc, irc)
+
+    io_loop.add_timeout(datetime.timedelta(seconds=6), reg)
+    io_loop.add_timeout(datetime.timedelta(seconds=8), cb)
 
     send_loop = ioloop.PeriodicCallback(send_latest, TIME_STEP*1000)
     send_loop.start()
