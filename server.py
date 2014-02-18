@@ -10,7 +10,7 @@ from io import BytesIO
 from tornado import ioloop, iostream
 from PIL import Image, ImageFont, ImageDraw
 from irctest import IRCConn
-from .local import IRC_PASS, SECRET_NICKS
+from local import IRC_PASS, SECRET_NICKS
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -177,10 +177,10 @@ if __name__ == '__main__':
 
     def register(irc):
         irc.privmsg('nickserv', "identify {}".format(IRC_PASS))
-    reg = functools.partial(joinirc, irc)
+    reg = functools.partial(register, irc)
 
-    io_loop.add_timeout(datetime.timedelta(seconds=6), reg)
-    io_loop.add_timeout(datetime.timedelta(seconds=8), cb)
+    io_loop.add_timeout(datetime.timedelta(seconds=12), reg)
+    io_loop.add_timeout(datetime.timedelta(seconds=15), cb)
 
     send_loop = ioloop.PeriodicCallback(send_latest, TIME_STEP*1000)
     send_loop.start()
