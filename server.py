@@ -52,7 +52,7 @@ def get_header_data():
 
 def new_msg(msg):
     raw_msg = msg.decode("utf-8", 'ignore')
-    full_msg = "{}{}".format(random.choice(["fishmech", "stymie"]), raw_msg[raw_msg.find(":"):])
+    full_msg = u"{}{}".format(random.choice([u"fishmech", u"stymie"]), raw_msg[raw_msg.find(":"):].encode("ascii", 'ignore'))
     print repr(full_msg)
 
     output_buffer.append(full_msg)
