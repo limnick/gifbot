@@ -3,6 +3,7 @@ import functools
 import socket
 import datetime
 import os
+import random
 import gifplugin as GifImagePlugin
 from collections import deque
 from images2gif import GifWriter
@@ -50,7 +51,11 @@ def get_header_data():
     return rio.getvalue()
 
 def new_msg(msg):
-    output_buffer.append(msg.decode("utf-8", 'ignore'))
+    raw_msg = msg.decode("utf-8", 'ignore')
+    full_msg = "{}{}".format(random.choice(["fishmech", "stymie"]), raw_msg[raw_msg.find(":"):])
+    print repr(full_msg)
+
+    output_buffer.append(full_msg)
     if len(output_buffer) > 6:
         output_buffer.popleft()
 
@@ -93,7 +98,7 @@ def handle_connection(connection, address):
     stream.write("HTTP/1.0 200 OK\r\n")
     stream.write("Content-Type: image/gif\r\n")
     stream.write("\r\n")
-    
+
     stream.write(HEADER_DATA)
     stream.write(LAST_FRAME)
     if CLOSE_ON_TIMEOUT:
@@ -104,7 +109,7 @@ def handle_connection(connection, address):
 def send_latest():
     global streams, LAST_FRAME
     latest_gif = get_img_frame()
-    
+
     del LAST_FRAME
     LAST_FRAME = latest_gif
 
@@ -131,7 +136,7 @@ def gen_img():
 def get_img_frame():
     img, palette = gen_img()
     rio = BytesIO()
-    
+
     data = GifImagePlugin.getdata(img)
     imdes, data = data[0], data[1:]
     graphext = gifWriter.getGraphicsControlExt(duration=TIME_STEP)
@@ -141,7 +146,7 @@ def get_img_frame():
 
     for d in data:
         rio.write(d)
-    
+
     return rio.getvalue()
 
 def chanmsg(self, channel, username, message):
