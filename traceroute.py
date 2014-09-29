@@ -3,6 +3,7 @@ import functools
 import socket
 import datetime
 import os
+import signal
 import gifplugin as GifImagePlugin
 from images2gif import GifWriter
 from io import BytesIO
@@ -16,11 +17,12 @@ HEADER_DATA = None
 CLOSE_ON_TIMEOUT = True
 
 BIND_ADDR = "0.0.0.0"
-BIND_PORT = 8000
+BIND_PORT = 80
 
-TIME_STEP = 4
-MAX_TIME = 60
+TIME_STEP = 2
+MAX_TIME = 30
 
+NUM_LINES_DISPLAY = 6
 LINE_SPACING = 14
 MARGIN = 2
 FONT = ImageFont.truetype(os.path.join(BASE_PATH, "anony.ttf"), 12)
@@ -89,10 +91,20 @@ def _handle_headers(stream, data):
             if is_mobile:
                 stream.close()
 
-def closestream(stream):
+def closestream(stream, traceroute_proc):
+    _kill_traceroute(traceroute_proc)
     if not stream.closed():
         stream.write(";")
         stream.close()
+
+def _kill_traceroute(traceroute_proc):
+    try:
+        os.killpg(traceroute_proc.pid, signal.SIGTERM)
+    except OSError:
+        pass
+
+def _handleResult(output_buffer, result):
+    output_buffer.append(result)
 
 def handle_connection(connection, address):
     stream = iostream.IOStream(connection)
@@ -107,52 +119,63 @@ def handle_connection(connection, address):
 
     #exec traceroute against host ip
     remote_ip = address[0]
-    remote_ip = "google.com"
     traceroute_proc = process.Subprocess(['traceroute', '-w', '5', '-q', '1', '-S', remote_ip], stdout=process.Subprocess.STREAM)
     traceroute_proc.initialize()
 
     output_buffer = []
-    def _handleResult(result):
-        output_buffer.append(result)
-        print "AA", result, repr(output_buffer)
-    result = traceroute_proc.stdout.read_until_close(callback=_handleResult, streaming_callback=_handleResult)
+    _cb = functools.partial(_handleResult, output_buffer)
+
+    result = traceroute_proc.stdout.read_until_close(callback=_cb, streaming_callback=_cb)
 
     if CLOSE_ON_TIMEOUT:
-        #TODO: also kill traceroute_proc
-        callback = functools.partial(closestream, stream)
+        callback = functools.partial(closestream, stream, traceroute_proc)
         ioloop.IOLoop.instance().add_timeout(datetime.timedelta(seconds=MAX_TIME), callback)
 
     streams.append((stream, traceroute_proc, output_buffer, 0))
 
 def send_latest():
     global streams
-    print "SS", len(streams)
 
     new_streams = []
-    for stream, traceroute_proc, output_buffer, buffer_index in streams:
-        print "s", stream, traceroute_proc, output_buffer, buffer_index
-        if not stream.closed():
-            print "SEND", repr(output_buffer)
-            latest_gif = get_img_frame(output_buffer, buffer_index)
+    for stream, traceroute_proc, output_buffer, frame_number in streams:
+        if stream.closed():
+            _kill_traceroute(traceroute_proc)
+        else:
+            latest_gif,new_frame_number = get_img_frame(output_buffer, frame_number)
             stream.write(latest_gif)
-            new_streams.append((stream, traceroute_proc, output_buffer, buffer_index))
+            new_streams.append((stream, traceroute_proc, output_buffer, new_frame_number))
 
     del streams
     streams = new_streams
 
-def gen_img(output_buffer, buffer_index):
+def gen_img(output_buffer, frame_number):
     img = Image.new("RGB", (600,100))
     draw = ImageDraw.Draw(img)
 
-    for i,line in enumerate(output_buffer):
-        draw.text((MARGIN,MARGIN+(i*LINE_SPACING)), line, (0,255,0), font=FONT)
+    bufferlen = len(output_buffer)
+
+    c = 0
+    i = frame_number
+    underrun = False
+    if bufferlen < NUM_LINES_DISPLAY:
+        underrun = True
+        i = 0
+
+    while c < NUM_LINES_DISPLAY:
+        i = i % bufferlen
+        line = output_buffer[i]
+        if underrun and c >= bufferlen:
+            line = ""
+        draw.text((MARGIN,MARGIN+(c*LINE_SPACING)), line, (0,255,0), font=FONT)
+        c += 1
+        i += 1
 
     img = img.convert("P")
     palette = img.im.getpalette("RGB")[:768]
-    return img, palette
+    return img, palette, frame_number+1
 
-def get_img_frame(output_buffer, buffer_index):
-    img, palette = gen_img(output_buffer, buffer_index)
+def get_img_frame(output_buffer, frame_number):
+    img, palette, new_frame_number = gen_img(output_buffer, frame_number)
     rio = BytesIO()
 
     data = GifImagePlugin.getdata(img)
@@ -165,16 +188,8 @@ def get_img_frame(output_buffer, buffer_index):
     for d in data:
         rio.write(d)
 
-    return rio.getvalue()
+    return rio.getvalue(), new_frame_number
 
-def chanmsg(self, channel, username, message):
-    if username in SECRET_NICKS:
-        username = "YOSPOSTER"
-    new_msg("{}: {}".format(username, message))
-    if message.startswith("!watchers"):
-        msg = "There are {} open sockets. ".format(len(streams))
-        self.chanmsg("#yospos", msg)
-    # print "CHANMSG ", channel, username, message, ""
 
 if __name__ == '__main__':
     HEADER_DATA = get_header_data()
