@@ -20,9 +20,9 @@ BIND_ADDR = "0.0.0.0"
 BIND_PORT = 80
 
 TIME_STEP = 2
-MAX_TIME = 30
+MAX_TIME = 40
 
-NUM_LINES_DISPLAY = 6
+NUM_LINES_DISPLAY = 7
 LINE_SPACING = 14
 MARGIN = 2
 FONT = ImageFont.truetype(os.path.join(BASE_PATH, "anony.ttf"), 12)
