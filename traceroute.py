@@ -35,7 +35,7 @@ gifWriter.transparency = False
 def _get_init_img_frame():
     img = Image.new("RGB", (600,100))
     draw = ImageDraw.Draw(img)
-    for i,line in enumerate(["", "", " -- LOADING -- ", "", "", ""]):
+    for i,line in enumerate(["", "", " -- LOADING TRACEROUTE -- ", "", "", ""]):
         draw.text((MARGIN,MARGIN+(i*LINE_SPACING)), line, (0,255,0), font=FONT)
     img = img.convert("P")
     palette = img.im.getpalette("RGB")[:768]
@@ -104,7 +104,7 @@ def _kill_traceroute(traceroute_proc):
         pass
 
 def _handleResult(output_buffer, result):
-    output_buffer.append(result)
+    output_buffer.extend(result.split("\n"))
 
 def handle_connection(connection, address):
     stream = iostream.IOStream(connection)
@@ -119,7 +119,7 @@ def handle_connection(connection, address):
 
     #exec traceroute against host ip
     remote_ip = address[0]
-    traceroute_proc = process.Subprocess(['traceroute', '-w', '5', '-q', '1', '-S', remote_ip], stdout=process.Subprocess.STREAM)
+    traceroute_proc = process.Subprocess(['mtr', '-c', '3', '-r', '-o', 'LSD BAW', remote_ip], stdout=process.Subprocess.STREAM)
     traceroute_proc.initialize()
 
     output_buffer = []
@@ -161,7 +161,7 @@ def gen_img(output_buffer, frame_number):
         underrun = True
         i = 0
 
-    while c < NUM_LINES_DISPLAY:
+    while bufferlen > 0 and c < NUM_LINES_DISPLAY:
         i = i % bufferlen
         line = output_buffer[i]
         if underrun and c >= bufferlen:
