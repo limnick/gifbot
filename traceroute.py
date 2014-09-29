@@ -152,7 +152,12 @@ def gen_img(output_buffer, frame_number):
     img = Image.new("RGB", (600,100))
     draw = ImageDraw.Draw(img)
 
+
     bufferlen = len(output_buffer)
+    if bufferlen > 0:
+        new_frame_number = frame_number+1
+    else:
+        new_frame_number = 0
 
     c = 0
     i = frame_number
@@ -172,7 +177,7 @@ def gen_img(output_buffer, frame_number):
 
     img = img.convert("P")
     palette = img.im.getpalette("RGB")[:768]
-    return img, palette, frame_number+1
+    return img, palette, new_frame_number
 
 def get_img_frame(output_buffer, frame_number):
     img, palette, new_frame_number = gen_img(output_buffer, frame_number)
