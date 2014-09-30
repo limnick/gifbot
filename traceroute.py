@@ -19,7 +19,7 @@ CLOSE_ON_TIMEOUT = True
 BIND_ADDR = "0.0.0.0"
 BIND_PORT = 80
 
-TIME_STEP = 2
+TIME_STEP = 1
 MAX_TIME = 40
 
 NUM_LINES_DISPLAY = 7
@@ -141,9 +141,12 @@ def send_latest():
         if stream.closed():
             _kill_traceroute(traceroute_proc)
         else:
-            latest_gif,new_frame_number = get_img_frame(output_buffer, frame_number)
+            latest_gif,new_frame_number,done = get_img_frame(output_buffer, frame_number)
             stream.write(latest_gif)
-            new_streams.append((stream, traceroute_proc, output_buffer, new_frame_number))
+            if done:
+                closestream(stream, traceroute_proc)
+            else:
+                new_streams.append((stream, traceroute_proc, output_buffer, new_frame_number))
 
     del streams
     streams = new_streams
@@ -151,13 +154,17 @@ def send_latest():
 def gen_img(output_buffer, frame_number):
     img = Image.new("RGB", (600,100))
     draw = ImageDraw.Draw(img)
-
+    done = False
 
     bufferlen = len(output_buffer)
     if bufferlen > 0:
         new_frame_number = frame_number+1
     else:
         new_frame_number = 0
+
+    if (frame_number * TIME_STEP) > 5:
+        if new_frame_number > bufferlen:
+            done = True
 
     c = 0
     i = frame_number
@@ -177,10 +184,10 @@ def gen_img(output_buffer, frame_number):
 
     img = img.convert("P")
     palette = img.im.getpalette("RGB")[:768]
-    return img, palette, new_frame_number
+    return img, palette, new_frame_number, done
 
 def get_img_frame(output_buffer, frame_number):
-    img, palette, new_frame_number = gen_img(output_buffer, frame_number)
+    img, palette, new_frame_number, done = gen_img(output_buffer, frame_number)
     rio = BytesIO()
 
     data = GifImagePlugin.getdata(img)
@@ -193,7 +200,7 @@ def get_img_frame(output_buffer, frame_number):
     for d in data:
         rio.write(d)
 
-    return rio.getvalue(), new_frame_number
+    return rio.getvalue(), new_frame_number, done
 
 
 if __name__ == '__main__':
