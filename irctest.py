@@ -2,6 +2,7 @@ import logging
 import re
 import socket
 import ssl
+import sys
 
 import tornado.ioloop
 import tornado.iostream
@@ -16,6 +17,7 @@ CHANMSG_RE=re.compile(':(?P<username>[^!]+)!(?P<who>[^ ]+) PRIVMSG (?P<chan>#[^ 
 PRIVMSG_RE=re.compile(':(?P<username>[^!]+)!(?P<who>[^ ]+) PRIVMSG (?P<user>[^#][^ ]*) :(?P<msg>.*)')
 ERROR_RE=re.compile('ERROR :(?P<msg>.*)')
 
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class IRCConn(object):
     def __init__(self, nickname, full_name="Tornado IRC", io_loop=None):
@@ -59,25 +61,24 @@ class IRCConn(object):
             self.conn = tornado.iostream.SSLIOStream(sock, io_loop=self.io_loop)
         else:
             self.conn = tornado.iostream.IOStream(sock, io_loop=self.io_loop)
-        self.conn.read_until("\n", self._handle_data)
+        self._handle_data("")
 
     def _write(self, data, *args, **kwargs):
         logging.debug('<<< %s', data)
         self.conn.write(data + '\r\n', *args, **kwargs)
 
     def _handle_data(self, data):
-        # print ">>>", data.rstrip()
         logging.debug(">>> %s", data.rstrip())
         ping_md = PING_RE.match(data)
         if ping_md:
             self._write("PONG " + ping_md.group('message'))
         if self._state == IRC_DISCONNECTED:
-            if self._password:
-                self._write("PASS %s" % self._password)
-            self._state = IRC_NICK
-        elif self._state == IRC_NICK:
             self._write("NICK %s" % self.nickname)
             self._write("USER %s 8 *  :%s" % (self.nickname, self.full_name))
+            self._state = IRC_NICK
+        elif self._state == IRC_NICK:
+            if self._password:
+                self._write("PASS %s:%s" % (self.nickname, self._password))
             self._state = IRC_CONNECTING
         elif self._state == IRC_CONNECTING:
             self.on_connect()

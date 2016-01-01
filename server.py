@@ -3,7 +3,6 @@ import functools
 import socket
 import datetime
 import os
-import random
 import gifplugin as GifImagePlugin
 from collections import deque
 from images2gif import GifWriter
@@ -11,32 +10,46 @@ from io import BytesIO
 from tornado import ioloop, iostream
 from PIL import Image, ImageFont, ImageDraw
 from irctest import IRCConn
-from local import IRC_PASS, SECRET_NICKS
+from local import IRC_PASS, SECRET_NICKS, IRC_NETWORK
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 
-LAST_FRAME,HEADER_DATA = None,None
-
 CLOSE_ON_TIMEOUT = True
 
-BOT_NAME = "gifbot"
-IRC_NETWORK = "irc.synirc.net"
+BOT_NAME = "freenode_bot"
+PUB_IRC_NETWORK = "irc.freenode.org"
+IRC_PORT = 7000
+IRC_CHAN = "#sharktopus"
+DO_SSL = True
+
+FRAME_SPINNER = "------"
+SPINNER_LEN = len(FRAME_SPINNER)
+
+IMG_WIDTH = 600
+IMG_HEIGHT = 120
 
 BIND_ADDR = "0.0.0.0"
-BIND_PORT = 80
+BIND_PORT = 9000
 
 TIME_STEP = 4
 MAX_TIME = 60
+
+FRAMECOUNT = 0
 
 LINE_SPACING = 14
 MARGIN = 2
 FONT = ImageFont.truetype(os.path.join(BASE_PATH, "anony.ttf"), 12)
 
+TOTAL_NUM_LINES = (IMG_HEIGHT / LINE_SPACING) - 1
+print "tot", TOTAL_NUM_LINES
+
 streams = set()
-output_buffer = deque(["" for _ in range(6)])
+LAST_FRAME,HEADER_DATA = None,None
+output_buffer = deque(["" for _ in range(TOTAL_NUM_LINES)])
 
 gifWriter = GifWriter()
 gifWriter.transparency = False
+
 
 def get_header_data():
     rio = BytesIO()
@@ -50,13 +63,16 @@ def get_header_data():
     rio.write(appext)
     return rio.getvalue()
 
+
 def new_msg(msg):
     raw_msg = msg.decode("utf-8", 'ignore')
-    full_msg = u"{}{}".format(random.choice([u"fishmech", u"stymie"]), raw_msg[raw_msg.find(":"):].encode("ascii", 'ignore'))
+    if raw_msg.startswith("***"):
+        return
 
-    output_buffer.append(full_msg)
-    if len(output_buffer) > 6:
+    output_buffer.append(raw_msg)
+    if len(output_buffer) > TOTAL_NUM_LINES:
         output_buffer.popleft()
+
 
 def connection_ready(sock, fd, events):
     while True:
@@ -70,9 +86,11 @@ def connection_ready(sock, fd, events):
         connection.setblocking(0)
         handle_connection(connection, address)
 
+
 def _handle_headers(stream, data):
     lines = data.split("\r\n")
-    request,headers = lines[0],lines[1:-2]
+    request, headers = lines[0], lines[1:-2]
+    print request
     for header in headers:
         try:
             param,val = map(str.strip, header.split(":"))
@@ -85,10 +103,12 @@ def _handle_headers(stream, data):
             if is_mobile:
                 stream.close()
 
+
 def closestream(stream):
     if not stream.closed():
         stream.write(";")
         stream.close()
+
 
 def handle_connection(connection, address):
     stream = iostream.IOStream(connection)
@@ -105,9 +125,14 @@ def handle_connection(connection, address):
         ioloop.IOLoop.instance().add_timeout(datetime.timedelta(seconds=MAX_TIME), callback)
     streams.add(stream)
 
+
 def send_latest():
-    global streams, LAST_FRAME
+    global streams, LAST_FRAME, FRAMECOUNT
     latest_gif = get_img_frame()
+
+    FRAMECOUNT += 1
+    if FRAMECOUNT >= SPINNER_LEN:
+        FRAMECOUNT = 0
 
     del LAST_FRAME
     LAST_FRAME = latest_gif
@@ -121,16 +146,30 @@ def send_latest():
     del streams
     streams = new_streams
 
+
 def gen_img():
-    img = Image.new("RGB", (600,100))
+    img = Image.new("RGB", (IMG_WIDTH,IMG_HEIGHT))
     draw = ImageDraw.Draw(img)
 
-    draw.text((MARGIN,MARGIN+(LINE_SPACING*6)), "----------- [{: ^18s}] ------ #yospos ------ synirc ------------".format(str(len(streams))+" viewers"), (0,255,0), font=FONT)
+    spinner_pos = FRAMECOUNT % SPINNER_LEN
+    frame_spinner = FRAME_SPINNER[:spinner_pos] + '*' + FRAME_SPINNER[spinner_pos+1:]
+
+    draw.text(
+        (MARGIN,MARGIN+(LINE_SPACING*TOTAL_NUM_LINES)),
+        "---- [{viewerstr: ^18s}] {frame_spinner:s} {chan: ^14s} -- {server: ^18s} ----".format(**{
+            'viewerstr': str(len(streams))+" viewers",
+            'frame_spinner': frame_spinner,
+            'chan': IRC_CHAN,
+            'server': PUB_IRC_NETWORK,
+        }),
+        (0,255,0),
+        font=FONT)
     for i,line in enumerate(output_buffer):
         draw.text((MARGIN,MARGIN+(i*LINE_SPACING)), line, (0,255,0), font=FONT)
     img = img.convert("P")
     palette = img.im.getpalette("RGB")[:768]
     return img, palette
+
 
 def get_img_frame():
     img, palette = gen_img()
@@ -148,13 +187,14 @@ def get_img_frame():
 
     return rio.getvalue()
 
+
 def chanmsg(self, channel, username, message):
     if username in SECRET_NICKS:
         username = "YOSPOSTER"
     new_msg("{}: {}".format(username, message))
     if message.startswith("!watchers"):
         msg = "There are {} open sockets. ".format(len(streams))
-        self.chanmsg("#yospos", msg)
+        self.chanmsg(IRC_CHAN, msg)
     # print "CHANMSG ", channel, username, message, ""
 
 if __name__ == '__main__':
@@ -173,17 +213,18 @@ if __name__ == '__main__':
 
     irc = IRCConn(BOT_NAME, BOT_NAME, io_loop)
     irc.on_chanmsg = functools.partial(chanmsg, irc)
-    irc.connect(IRC_NETWORK, 6667)
+    # irc.connect(IRC_NETWORK, IRC_PORT, do_ssl=True)
+    irc.connect(IRC_NETWORK, IRC_PORT, do_ssl=DO_SSL, password=IRC_PASS)
 
     def joinirc(irc):
-        irc.join("#yospos")
+        irc.join(IRC_CHAN)
     cb = functools.partial(joinirc, irc)
 
-    def register(irc):
-        irc.privmsg('nickserv', "identify {}".format(IRC_PASS))
-    reg = functools.partial(register, irc)
+    # def register(irc):
+    #     irc.privmsg('nickserv', "identify {}".format(IRC_PASS))
+    # reg = functools.partial(register, irc)
 
-    io_loop.add_timeout(datetime.timedelta(seconds=12), reg)
+    # io_loop.add_timeout(datetime.timedelta(seconds=12), reg)
     io_loop.add_timeout(datetime.timedelta(seconds=15), cb)
 
     send_loop = ioloop.PeriodicCallback(send_latest, TIME_STEP*1000)
