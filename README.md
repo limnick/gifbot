@@ -15,4 +15,6 @@
     The latest in webscale technology
 ```
 
-[example](http://198.61.197.103/sig.gif)
+[example](https://sharktopus.com/sig.gif)
+
+[larger example](https://sharktopus.com/site.gif)
