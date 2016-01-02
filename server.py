@@ -209,7 +209,8 @@ def get_img_frame(width,height):
 def chanmsg(self, channel, username, message):
     if username in SECRET_NICKS:
         username = "YOSPOSTER"
-    new_msg("{}: {}".format(username, message))
+    if channel == IRC_CHAN:
+        new_msg("{}: {}".format(username, message))
     if message.startswith("!watchers"):
         msg = "There are {} open sockets. ".format(len(streams))
         self.chanmsg(IRC_CHAN, msg)

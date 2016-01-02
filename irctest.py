@@ -17,7 +17,7 @@ CHANMSG_RE=re.compile(':(?P<username>[^!]+)!(?P<who>[^ ]+) PRIVMSG (?P<chan>#[^ 
 PRIVMSG_RE=re.compile(':(?P<username>[^!]+)!(?P<who>[^ ]+) PRIVMSG (?P<user>[^#][^ ]*) :(?P<msg>.*)')
 ERROR_RE=re.compile('ERROR :(?P<msg>.*)')
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+# logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 class IRCConn(object):
     def __init__(self, nickname, full_name="Tornado IRC", io_loop=None):
