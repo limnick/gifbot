@@ -121,6 +121,9 @@ def _handle_headers(stream, data):
 
     stream.write(HEADER_DATA[cur_img_name])
     stream.write(LAST_FRAME[cur_img_name])
+    #when proxied by nginx the first frame doesnt fully load every time
+    # so we'll just send the inital frame twice
+    stream.write(LAST_FRAME[cur_img_name])
     if CLOSE_ON_TIMEOUT:
         callback = functools.partial(closestream, stream)
         ioloop.IOLoop.instance().add_timeout(datetime.timedelta(seconds=MAX_TIME), callback)
