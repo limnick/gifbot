@@ -214,9 +214,9 @@ def chanmsg(self, channel, username, message):
         username = "YOSPOSTER"
     if channel == IRC_CHAN:
         new_msg("{}: {}".format(username, message))
-    if message.startswith("!watchers"):
-        msg = "There are {} open sockets. ".format(len(streams))
-        self.chanmsg(IRC_CHAN, msg)
+        if message.startswith("!watchers"):
+            msg = "There are {} open sockets. ".format(len(streams))
+            self.chanmsg(IRC_CHAN, msg)
     # print "CHANMSG ", channel, username, message, ""
 
 if __name__ == '__main__':
