@@ -4,22 +4,18 @@ import socket
 import datetime
 import os
 import gifplugin as GifImagePlugin
-from collections import deque
 from images2gif import GifWriter
 from io import BytesIO
 from tornado import ioloop, iostream
 from PIL import Image, ImageFont, ImageDraw
 from irctest import IRCConn
-from local import IRC_PASS, SECRET_NICKS, IRC_NETWORK
+from local import BOT_NAME, IRC_PASS, SECRET_NICKS, IRC_NETWORK, PUB_IRC_NETWORK, IRC_CHAN
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 
 CLOSE_ON_TIMEOUT = True
 
-BOT_NAME = "freenode_bot"
-PUB_IRC_NETWORK = "irc.freenode.org"
 IRC_PORT = 7000
-IRC_CHAN = "#sharktopus"
 DO_SSL = True
 
 FRAME_SPINNER = "------"
