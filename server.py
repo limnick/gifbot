@@ -9,7 +9,12 @@ from io import BytesIO
 from tornado import ioloop, iostream
 from PIL import Image, ImageFont, ImageDraw
 from irctest import IRCConn
-from local import BOT_NAME, IRC_PASS, SECRET_NICKS, IRC_NETWORK, PUB_IRC_NETWORK, IRC_CHAN
+
+BOT_NAME = os.environ.get('BOT_NAME')
+IRC_PASS = os.environ.get('IRC_PASS')
+IRC_NETWORK = os.environ.get('IRC_NETWORK')
+PUB_IRC_NETWORK = os.environ.get('PUB_IRC_NETWORK')
+IRC_CHAN = os.environ.get('IRC_CHAN')
 
 BASE_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -206,8 +211,6 @@ def get_img_frame(width,height):
 
 
 def chanmsg(self, channel, username, message):
-    if username in SECRET_NICKS:
-        username = "YOSPOSTER"
     if channel == IRC_CHAN:
         new_msg("{}: {}".format(username, message))
         # if message.startswith("!watchers"):

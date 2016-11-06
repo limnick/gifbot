@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gifbot
+  labels:
+    app: gifbot
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9000
+    protocol: TCP
+    name: gifbot
+  selector:
+    app: gifbot

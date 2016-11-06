@@ -1,0 +1,50 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gifbot
+spec:
+  replicas: 1
+  template:
+    metadata:
+      name: gifbot
+      labels:
+        app: gifbot
+    spec:
+      containers:
+      - name: gifbot
+        image: limnick/gifbot:latest
+        imagePullPolicy: Always
+        readinessProbe:
+          tcpSocket:
+            port: gifbot
+          initialDelaySeconds: 15
+          timeoutSeconds: 2
+        ports:
+        - containerPort: 9000
+          name: gifbot
+        env:
+        - name: BOT_NAME
+          valueFrom:
+            secretKeyRef:
+              name: gifbot-secrets
+              key: bot-name
+        - name: IRC_PASS
+          valueFrom:
+            secretKeyRef:
+              name: gifbot-secrets
+              key: irc-pass
+        - name: IRC_NETWORK
+          valueFrom:
+            secretKeyRef:
+              name: gifbot-secrets
+              key: irc-network
+        - name: PUB_IRC_NETWORK
+          valueFrom:
+            secretKeyRef:
+              name: gifbot-secrets
+              key: pub-irc-network
+        - name: IRC_CHAN
+          valueFrom:
+            secretKeyRef:
+              name: gifbot-secrets
+              key: irc-chan
